@@ -1,3 +1,7 @@
+# Changes in this fork
+
+- Support shadow-root elements.
+
 # DOM to Image
 
 [![Build Status](https://travis-ci.org/tsayen/dom-to-image.svg?branch=master)](https://travis-ci.org/tsayen/dom-to-image)

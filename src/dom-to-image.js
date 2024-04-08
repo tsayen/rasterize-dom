@@ -136,13 +136,13 @@
 
     function copyOptions(options) {
         // Copy options to impl options for use in impl
-        if(typeof(options.imagePlaceholder) === 'undefined') {
+        if (typeof (options.imagePlaceholder) === 'undefined') {
             domtoimage.impl.options.imagePlaceholder = defaultOptions.imagePlaceholder;
         } else {
             domtoimage.impl.options.imagePlaceholder = options.imagePlaceholder;
         }
 
-        if(typeof(options.cacheBust) === 'undefined') {
+        if (typeof (options.cacheBust) === 'undefined') {
             domtoimage.impl.options.cacheBust = defaultOptions.cacheBust;
         } else {
             domtoimage.impl.options.cacheBust = options.cacheBust;
@@ -175,39 +175,82 @@
     }
 
     function cloneNode(node, filter, root) {
-        if (!root && filter && !filter(node)) return Promise.resolve();
+        console.log("==> Entering cloneNode function for node="+node);
 
+        if (!root && filter && !filter(node)) {
+            console.log("Filter condition met. Returning Promise.resolve()");
+            return Promise.resolve();
+        }
+
+        console.log("Creating promise to clone node");
         return Promise.resolve(node)
             .then(makeNodeCopy)
             .then(function (clone) {
+                console.log("Cloning children");
                 return cloneChildren(node, clone, filter);
             })
             .then(function (clone) {
+                console.log("Processing clone");
                 return processClone(node, clone);
             });
 
         function makeNodeCopy(node) {
-            if (node instanceof HTMLCanvasElement) return util.makeImage(node.toDataURL());
+            console.log("Making node copy");
+            if (node instanceof HTMLCanvasElement) {
+                console.log("Node is an instance of HTMLCanvasElement. Making image.");
+                return util.makeImage(node.toDataURL());
+            }
+            console.log("Node is not an instance of HTMLCanvasElement. Cloning node.");
             return node.cloneNode(false);
         }
 
+        function loopThroughShadowRootContent(element, func) {
+            // Check if the element has a shadow root
+            if (element.shadowRoot) {
+                // If it does, apply the function to each element within the shadow root
+                element.shadowRoot.childNodes.forEach(func);
+                // Recursively apply the function to each child of the shadow root
+                element.shadowRoot.childNodes.forEach(child => {
+                    loopThroughShadowRootContent(child, func);
+                });
+            }
+        }
+
         function cloneChildren(original, clone, filter) {
+            console.log("Cloning children of node");
             var children = original.childNodes;
-            if (children.length === 0) return Promise.resolve(clone);
+
+            // Check if the element has a shadow root
+            if (original.shadowRoot) {
+                console.log("Element has shadow root");
+                var shadowChildren = original.shadowRoot.childNodes;
+                children = Array.from(children).concat(Array.from(shadowChildren));
+            } else {
+                console.log("Element does not have shadow root");
+            }
+
+            if (children.length === 0) {
+                console.log("No children. Resolving with clone.");
+                return Promise.resolve(clone);
+            }
 
             return cloneChildrenInOrder(clone, util.asArray(children), filter)
                 .then(function () {
+                    console.log("All children cloned. Resolving with clone.");
                     return clone;
                 });
 
             function cloneChildrenInOrder(parent, children, filter) {
+                console.log("Cloning children in order");
                 var done = Promise.resolve();
                 children.forEach(function (child) {
                     done = done
                         .then(function () {
+                            console.log("Cloning child node="+child);
                             return cloneNode(child, filter);
                         })
                         .then(function (childClone) {
+                            console.log("Appending cloned child to parent");
                             if (childClone) parent.appendChild(childClone);
                         });
                 });
@@ -216,7 +259,11 @@
         }
 
         function processClone(original, clone) {
-            if (!(clone instanceof Element)) return clone;
+            console.log("Processing clone");
+            if (!(clone instanceof Element)) {
+                console.log("Clone is not an instance of Element. Returning clone.");
+                return clone;
+            }
 
             return Promise.resolve()
                 .then(cloneStyle)
@@ -224,10 +271,12 @@
                 .then(copyUserInput)
                 .then(fixSvg)
                 .then(function () {
+                    console.log("All processing done. Resolving with clone.");
                     return clone;
                 });
 
             function cloneStyle() {
+                console.log("Cloning style");
                 copyStyle(window.getComputedStyle(original), clone.style);
 
                 function copyStyle(source, target) {
@@ -247,6 +296,7 @@
             }
 
             function clonePseudoElements() {
+                console.log("Cloning pseudo elements");
                 [':before', ':after'].forEach(function (element) {
                     clonePseudoElement(element);
                 });
@@ -290,11 +340,13 @@
             }
 
             function copyUserInput() {
+                console.log("Copying user input");
                 if (original instanceof HTMLTextAreaElement) clone.innerHTML = original.value;
                 if (original instanceof HTMLInputElement) clone.setAttribute("value", original.value);
             }
 
             function fixSvg() {
+                console.log("Fixing SVG");
                 if (!(clone instanceof SVGElement)) return;
                 clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 
@@ -462,7 +514,7 @@
 
         function getAndEncode(url) {
             var TIMEOUT = 30000;
-            if(domtoimage.impl.options.cacheBust) {
+            if (domtoimage.impl.options.cacheBust) {
                 // Cache bypass so we dont have CORS issues with cached images
                 // Source: https://developer.mozilla.org/en/docs/Web/API/XMLHttpRequest/Using_XMLHttpRequest#Bypassing_the_cache
                 url += ((/\?/).test(url) ? "&" : "?") + (new Date()).getTime();
@@ -479,9 +531,9 @@
                 request.send();
 
                 var placeholder;
-                if(domtoimage.impl.options.imagePlaceholder) {
+                if (domtoimage.impl.options.imagePlaceholder) {
                     var split = domtoimage.impl.options.imagePlaceholder.split(/,/);
-                    if(split && split[1]) {
+                    if (split && split[1]) {
                         placeholder = split[1];
                     }
                 }
@@ -490,7 +542,7 @@
                     if (request.readyState !== 4) return;
 
                     if (request.status !== 200) {
-                        if(placeholder) {
+                        if (placeholder) {
                             resolve(placeholder);
                         } else {
                             fail('cannot fetch resource: ' + url + ', status: ' + request.status);
@@ -508,7 +560,7 @@
                 }
 
                 function timeout() {
-                    if(placeholder) {
+                    if (placeholder) {
                         resolve(placeholder);
                     } else {
                         fail('timeout of ' + TIMEOUT + 'ms occured while fetching resource: ' + url);
